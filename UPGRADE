@@ -1,0 +1,89 @@
+0.6.1
+- update iris.cgi and exim.conf
+
+0.6
+- update iris.cgi, qwatch.pl, and exim.conf
+- execute in mysql mail database:
+
+mysql>
+    alter table accounts add (
+    superuser tinyint(1) NOT NULL default '0',
+    admin_quota int(11) NOT NULL default '0',
+    admin_accounts int(11) NOT NULL default '0',
+    admin_max_quota int(11) NOT NULL default '0',
+    admin_max_accounts int(11) NOT NULL default '0'
+  );
+  alter table domains add (`non_local` tinyint(1) NOT NULL default '0');
+  create table managed_domains (
+    `acc_id` int(11) NOT NULL,
+    `dom_id` int(11) NOT NULL,
+    KEY admin_domains (acc_id),
+    KEY domain_admins (dom_id)
+  );
+  create table `greylist` (
+    `id` int(11) NOT NULL auto_increment,
+    `relay_ip` varchar(64) default NULL,
+    `from_domain` varchar(255) default NULL,
+    `block_expires` datetime NOT NULL default '0000-00-00 00:00:00',
+    `record_expires` datetime NOT NULL default '0000-00-00 00:00:00',
+    `origin_type` enum('MANUAL','AUTO') NOT NULL default 'AUTO',
+    `create_time` datetime NOT NULL default '0000-00-00 00:00:00',
+    PRIMARY KEY (`id`),
+    KEY `relay_ip` (`relay_ip`(15),`from_domain`(20))
+  );
+
+- cgi-lib.pl is no longer needed
+- http authentication is obsoleted and built-in cookie based login is used
+  instead
+- install CGI::Lite and Digest::HMAC_MD5 modules
+- the pre-0.4 compatibility feature to login using _ instead of . in login
+  username (e.g. user@domain_com) was dropped
+
+
+0.5.x
+- update iris.cgi, qwatch.pl, and exim.conf
+- no mysql schema changes
+
+
+0.4.3
+- update iris.cgi
+- execute in mysql mail database:
+
+mysql> alter table accounts add (av_disabled boolean not null default 0);
+
+- review changes in exim.conf acl_check_rcpt and acl_check_content
+  + $acl_m0 is used to skip AV checks
+  + a typo where condition = $message_size < 1m was placed after demime=*
+    and malware=* is corrected
+
+
+0.4.2
+- update iris.cgi
+
+
+0.4.1
+- update iris.cgi
+
+
+0.4
+- reinstall and migrate accounts
+
+
+0.3
+- add new MYSQL_* and VACATION_TEXT_DEFAULT definitions to exim.conf
+- add vacation director and transport to exim.conf
+- add SMTP auth definitions to exim.conf Authentication configuration section
+- execute following SQL commands:
+
+mysql> alter table accounts add (smtp_auth bool, vacation bool, vacation_text text);
+mysql> alter table domains  add (smtp_auth bool);
+
+
+0.2
+- execute following SQL commands:
+
+mysql> alter table accounts add (disabled bool);
+mysql> alter table domains  add (disabled bool);
+
+
+0.1 released

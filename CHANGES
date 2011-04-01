@@ -1,0 +1,41 @@
+0.6.1
+- Fixed reversed sorting of account listing at accounts creation time.
+- Fixed usage of upper case letters in account name.
+- Fixed IMAP mailbox creation for non-local domains.
+- Fixed corruption of non-ascii characters in vacation auto-reply messages.
+- Greylisting now work at /24 network level for better GMail compatibility.
+- Compatibility with Perl 5.12.
+- Improved documentation.
+
+0.6
+- Delegated domain management has been implemented.
+
+0.5
+- Various Web-interface and quota monitor enhancements and bug-fixes.
+
+0.4.3
+- A flag in accounts database to skip AV check for account is implemented.
+- exim.conf bugfix: skip AV (ClamAV) check if message is larger than specified.
+
+0.4.2
+- Listing of over-quota accounts across all mail spools is implemented.
+
+0.4.1
+- Cosmetic bugfixes to iris.cgi.
+
+0.4
+- Email setup has been moved from Cyrus IMAP to Courier IMAP, and Exim
+  configuration has been upgraded to version 4.
+- AV/spam/over-quota SMTP time rejection is implemented, along with UTF-8 clean
+  vacation and welcome messages, various enhancements to Web-interface, and
+  real-time over-quota monitor.
+  
+0.3
+- Authenticated SMTP relay and vacation message features have been implemented.
+
+0.2
+- A domain can now be disabled without deleting it from the system.
+  Mails are still delivered but clients cannot login via IMAP and POP3.
+
+0.1
+- Initial release.

@@ -1,0 +1,267 @@
+Iris is a CGI script, Exim MTA configuration file, and instructions to build an
+e-mail server with virtual domains support, authenticated SMTP relay, vacation,
+SMTP-time malware/spam/over-quota reject, and web based account and domain
+administration, including domain-level access control for delegated domain
+management.
+Based on Exim MTA, Courier IMAP or, alternativelly, Dovecot, MySQL, Perl.
+
+
+1. Features
+
+- Single server in this configuration is able to handle multiple independent
+  domains with separate sets of users and aliases.
+- Accounts maintenance is performed via web interface.
+- Super-user(s) can modify everything. Selected users are allowed to modify
+  domain(s) assigned to them, within limits set by configured quota.
+- Malware is stopped at SMTP time by rejecting delivery instantly, basing
+  on the decisions made by antivirus and antispam software, supplemented with
+  RBL.
+- Accounts are monitored for space usage and e-mail delivery is deferred in
+  case of over-quota condition.
+- Vacation auto-responder is careful to whom and when it sends replies to and
+  is end-user controllable via supplied SquirrelMail plug-in.
+- IMAP/POP3 logins could be restricted for selected domain, preserving accounts
+  and uninterrupted incoming message delivery.
+- In preparation to move particular e-mail domain to the server, the domain
+  could be hidden from MTA, and then made visible on the flip of a switch,
+  after initial configuration is performed.
+
+The system is used in a medium size installation - 1000+ active e-mail
+accounts - and proven to be reliable, low TCO solution.
+
+
+2. System components
+
+- Exim MTA http://www.exim.org/
+- IMAP server: Courier IMAP http://www.courier-mta.org/ or
+  Dovecot http://www.dovecot.org/
+- MySQL database http://www.mysql.com/
+- Any webserver with CGI support. SSL is recommended for security.
+- Perl and some additional modules from http://www.cpan.org/
+- Optionally, ClamAV antivirus http://www.clamav.net/
+  and SpamAssassin antispam filter http://spamassassin.apache.org/
+
+Tested with Exim 4.x, Courier IMAP 3.0, Dovecot 1.2, MySQL 4.1 and 5.1,
+Apache 1.3 and 2.2.
+All software components use standard distribution supplied install.
+
+
+3. Limitations
+
+- DNS setup is not discussed here and is a separate task.
+- This is not a box software, you need a basic understanding how underlying
+  components works: Exim, MySQL, etc. to be able to polish the install.
+- Webmail setup is not described, but SquirrelMail is a recommended choice (for
+  its excellent support of various character sets), together with supplied
+  set_email and mysql_vacation plug-ins.
+- All information about the domain, its accounts and aliases is presented on
+  one web page. This behavior simplifies programming and optimized for small
+  to medium number of accounts in domain.
+
+
+4. Upgrading
+
+For additional instructions specific to upgrading to current version see
+UPGRADE document.
+
+
+5. MySQL setup
+
+- Create database to be used for e-mail accounts information:
+
+mysql> create database mail;
+
+- Create two database users - one with SELECT right for Exim and Courier, and
+  another one with SELECT, INSERT, UPDATE, and DELETE rights for iris.cgi and
+  qwatch.pl:
+
+mysql> grant select on mail.* to exim@localhost identified by 'password1';
+mysql> grant insert on mail.greylist to exim@localhost;
+mysql> grant select,insert,update,delete on mail.* to iris@localhost identified by 'password2';
+
+- Create tables and initial superuser account by executing iris.sql via mysql:
+$ mysql mail < iris.sql
+
+
+6. Exim configuration
+
+Supplied exim.conf should be a good start for your setup.
+You need to create a number of (empty) list files in exim config/tabs/ directory.
+touch aliases.global && mkdir aliases tabs && cd tabs &&
+    touch host-reject ignore-dnsbl-hosts local-domains relay-domains relay-from-hosts
+Note that 'vacation_reply' transport need a directory to store history database
+and the transport's 'user' must differs from 'exim_user'. Setup a cron job to
+purge old database files (crontab -e -u smmsp):
+2 1 */10 * * find /var/spool/exim4/vacation -mtime +30 -print0 | xargs -0r rm
+Setup another cron job to expiry greylist entries:
+3 1 * * * echo "delete from greylist where record_expires < now();" | mysql mail
+For Dovecot you need to change in "spamuserbox" router and "imap_spam" transport
+$local_part@$domain/.Spam to $local_part@$domain/.INBOX.Spam
+
+
+7. IMAP setup
+
+7.1. Courier IMAP
+Put something like the following in authmysqlrc:
+
+MYSQL_SERVER    localhost
+MYSQL_USERNAME  exim
+MYSQL_PASSWORD  password1
+MYSQL_SOCKET    /tmp/mysql.sock41
+MYSQL_PORT      0
+MYSQL_OPT       0
+MYSQL_DATABASE  mail
+
+# username, cryptpw, clearpw, uid, gid, home, maildir, quota, fullname, options
+MYSQL_SELECT_CLAUSE \
+    select account, '', pwd, 800, 800, '/var/imap', account, quota, '', '' \
+      from accounts \
+     where account = concat('$(local_part)', '@', '$(domain)') \
+       and disabled = 0
+
+800 here is UID and GID of courier user.
+
+7.2. Dovecot
+In dovecot.conf:
+
+protocols = imap imaps
+disable_plaintext_auth = no
+protocol imap { ... mail_plugins = quota imap_quota ... }
+auth default {
+    mechanisms = plain login digest-md5 cram-md5
+    #passdb pam - disable
+    passdb sql { args = /etc/dovecot/dovecot-sql.conf }
+    #userdb passwd - disable
+    userdb static { args = uid=imap gid=imap home=/var/imap/%u }
+    # auth process id
+    user = mail
+}
+quota = maildir:Mail
+
+In dovecot-sql.conf:
+
+driver = mysql
+connect = host=localhost user=exim dbname=mail password=password1
+default_pass_scheme = PLAIN
+password_query = \
+  SELECT account as user, pwd as password \
+  FROM accounts WHERE account ='%u'
+
+
+8. Perl setup
+
+Install additional modules:
+- DBI
+- DBD::mysql
+- CGI::Lite
+- Digest::HMAC_MD5
+
+
+9. iris.cgi and webserver configuration
+
+- Edit iris.cgi and change configuration variables. Probably change
+  $html_start to use different CSS and <title>.
+- Place iris.cgi in cgi-bin directory.
+  CGI must execute with 'courier' UID to be able to create and remove maildir
+  directories when account is deleted. For Apache 2.2 add to config:
+  SuexecUserGroup courier courier
+  <Directory /srv/http/iris>
+      Options ExecCGI
+      AddHandler cgi-script .cgi
+      SSLOptions +StdEnvVars
+      DirectoryIndex iris.cgi
+  </Directory>
+- Optionally configure SSL in webserver.
+
+
+10. iris.cgi - admin web interface
+
+- Point your browser to iris.cgi location and login with
+  E-mail: admin
+  Password: superuserpassword
+  The account you just logged in is an initial superuser account.
+- Create and delete domain by entering its name in textbox and pressing
+  appropriate button.
+- To manage domain select domain name in listbox and press Show.
+- Every button on domain administration page work with corresponding
+  section only. For example, you can't create and delete accounts in one
+  step.
+- Domain level settings allows you to change default authenticated SMTP relay
+  policy for new accounts, to disable clients logins, and to hide the domain
+  from MTA.
+- To create account, enter information in following format:
+
+account[,QuotaMB,FirstName,Surname,phone#,other email,other info]
+
+  For example:
+
+john
+smit,20
+someone,25,Some,One,+371 9xxx,secret@email.com,bla-bla-bla goes here comma,allowed
+sparse,,,1234,,info
+
+  Default quota is defined in iris.cgi.
+
+- Create Aliases works similary. Format:
+
+alias aliased,to,..
+
+  'alias' should be name without domain. 'aliased,to' - email list. Name
+  without domain part in 'aliased,to' list means user in the same domain,
+  like traditional aliases file (user1@domain2.com,user -> user1@domain2.com,
+  user@domain.com).
+- To update or delete accounts enter new info or check a checkbox, then press
+  Update. You can update and delete multiple accounts in one step.
+- Toggle SMTP checkbox toggles authenticated SMTP relay for particular acount,
+  ie. if it is disabled it will be enabled, if it is enabled it will be
+  disabled.
+- Toggle AV checkbox disable or enable antivirus and spamassassin filtering for
+  account. AV filtering will be skipped if incoming mail has only one recipient
+  with this flag set and no aliases expansion occurred before delivery.
+- Aliases section works in similar way.
+- To edit vacation settings click on account name. When you change vacation
+  status between off and custom, then custom text is preserved, but the text is
+  erased if vacation is set to default text. Vacation message is UTF-8 clean.
+- To delegate domain management to the user, enter the list of managed domains
+  into text area and set the quota. The quota will be shared across the
+  specified domains and its usage will be updated even in case changes are made
+  by other administrators or superusers. Only superuser can assign
+  administrative rights.
+- IMAP quota column may differs from Quota because maildir quota may lag behind
+  real (database stored) quota which is updated by Exim at delivery time.
+- "Inbox modified" column shows the date when MUA modified the Inbox folder.
+  Technically, it is a modification time of maildir/cur/ directory.
+- It is recommended to create a real domain and e-email account for superuser
+  and delete initial superuser account and domain. At least change the password.
+  As a security measure assignment of superuser rights to an account is only
+  possible via mysql command line:
+mysql> update accounts set superuser = 1 where account = 'account@name.here';
+
+
+11. qwatch.pl - maildir over-quota monitor
+
+If you want messages to over-quota mailboxes to be rejected at SMTP time you
+may run qwatch.pl. Edit the script to change configuration and run under
+courier user:
+su -m courier -c '/usr/local/sbin/qwatch.pl &'
+At start it will read the state from MySQL database, re-check the state of
+previously over-quota mailboxes, then it will run in infinite loop periodically
+polling Exim main logfile for maildir over-quota messages, updating MySQL
+'accounts.overquota' flag and checking reported mailboxes to be still
+over-quota. Log file will be reopened when rotation is detected.
+Additionally, it monitors log file for peers that repeatedly hammers the server
+with messages larger than Exim message_size_limit (broken MUAs like Outlook) and
+updates the database to disable authenticated SMTP for them. This is a DoS
+potentially, so you can disable the functionality by commenting out
+$too_big_str configuration variable.
+
+
+12. Author and licensing
+
+Arkadi Shishlov - arkadi.shishlov at gmail.com
+The license is GPL v3.
+
+
+13. Getting help
+
+Visit http://groups.google.com/group/iris-mail
