@@ -1,6 +1,6 @@
 #!/usr/bin/perl -Tw
 
-# version 0.6.1
+# version 0.6.2
 
 # the inactivity period in seconds after which user must re-authenticate
 my $inactivity_period = 1200;
@@ -482,6 +482,7 @@ sub mysql_connect {
     $mysql = DBI->connect("dbi:mysql:dbname=$mysql_db;host=$mysql_host",
                  $mysql_user, $mysql_pwd)
         || error("Could not connect to MySQL server");
+    mysql_do("set names utf8");
 }
 
 # execute statement with bind variables

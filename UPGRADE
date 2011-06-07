@@ -1,3 +1,17 @@
+0.6.2
+- Update iris.cgi
+- In this version iris.cgi will use UTF-8 MySQL connection settings to write to
+the mail database. Most likely your database is in Latin1 encoding. To correct
+diacritic characters dump and re-import the database:
+$ mysqldump --default-character-set=latin1 mail > mail.sql
+$ sed -e 's/SET NAMES latin1/SET NAMES utf8/' < mail.sql | \
+    sed -e 's/ DEFAULT CHARSET=latin1//' > mail-utf8.sql
+$ mysql
+mysql> drop database mail;
+mysql> create database mail default character set utf8;
+mysql> use mail
+mysql> \. mysql-utf8.sql
+
 0.6.1
 - update iris.cgi and exim.conf
 

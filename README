@@ -69,7 +69,7 @@ UPGRADE document.
 
 - Create database to be used for e-mail accounts information:
 
-mysql> create database mail;
+mysql> create database mail default character set utf8;
 
 - Create two database users - one with SELECT right for Exim and Courier, and
   another one with SELECT, INSERT, UPDATE, and DELETE rights for iris.cgi and
