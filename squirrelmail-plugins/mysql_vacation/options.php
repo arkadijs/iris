@@ -110,6 +110,7 @@ function vacationMysqlConnect()
       showError('ERROR: Could not find database');
       exit(1);
    }
+   mysql_query('set names utf8', $vacationDB);
 }
 
 function vacationReadPref()
