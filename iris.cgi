@@ -556,7 +556,7 @@ sub int2kib {
     my $m = 1024*1024;
     my $g = 1024*1024*1024;
     my $r;
-    $r = $b/$g; return int($r) .'GB' if $r >= 1;
+    $r = $b/$g; return sprintf("%.1f", $r) .'GB' if $r >= 1;
     $r = $b/$m; return int($r) .'MB' if $r >= 1;
     $r = $b/$k; return int($r) .'KB' if $r >= 1;
     return $b;
