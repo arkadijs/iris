@@ -1,3 +1,8 @@
+0.6.2
+- Correct quota display when units hits GB
+- Fix SquirrelMail and Exim to use UTF-8 for vacation messages
+- Correct UTF-8 handling in MySQL
+
 0.6.1
 - Fixed reversed sorting of account listing at accounts creation time.
 - Fixed usage of upper case letters in account name.
