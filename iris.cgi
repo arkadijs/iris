@@ -1433,7 +1433,7 @@ my $headers_printed = 0;
 # output HTTP headers
 sub print_headers {
     return if $headers_printed;
-    my $headers = (defined @_) ? "\r\n". join ("\r\n", @_) : ""; # append header(s) from arguments if any
+    my $headers = @_ ? "\r\n". join ("\r\n", @_) : ""; # append header(s) from arguments if any
     print "Content-type: text/html; charset=utf-8\r\nExpires: Wed, 27 November 2000 18:00:00 GMT$headers\r\n\r\n";
     $headers_printed = 1;
 }
