@@ -19,7 +19,7 @@ Roundcube webmail.
 - Accounts are monitored for space usage and e-mail delivery is deferred in
   case of over-quota condition.
 - Vacation auto-responder is careful to whom and when it sends replies to and
-  is end-user controllable via Roundcube vacation plug-in.
+  is end-user controllable via Roundcube webmail vacation plug-in.
 - IMAP/POP3 logins could be disabled for selected domain, but preserving accounts
   and uninterrupted incoming message delivery.
 - In preparation to move particular e-mail domain to the server, the domain
