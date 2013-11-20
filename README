@@ -3,7 +3,7 @@ playbook, supplemented with instructions to build an e-mail server with virtual
 domains support, authenticated SMTP relay, vacation, SMTP-time malware/spam/over-quota
 reject, and web based account and domain administration, including domain-level
 access control for delegated domain management.
-Based on Exim MTA, Dovecot IMAP, MySQL, Perl.
+Based on Exim MTA, Dovecot IMAP, MySQL, Perl, Roundcube webmail.
 
 
 1. Features
