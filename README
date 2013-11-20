@@ -1,9 +1,10 @@
-Iris is a CGI script, Exim MTA and Dovecot configuration files, Vagrant & Ansible
-playbook, supplemented with instructions to build an e-mail server with virtual
-domains support, authenticated SMTP relay, vacation, SMTP-time malware/spam/over-quota
-reject, and web based account and domain administration, including domain-level
-access control for delegated domain management.
-Based on Exim MTA, Dovecot IMAP, MySQL, Perl, Roundcube webmail.
+Iris is a CGI script, Exim MTA and Dovecot configuration files, Vagrant and
+Ansible playbook, supplemented with instructions to build an e-mail server
+with virtual domains support, authenticated SMTP relay, vacation, SMTP-time
+malware/spam/over-quota reject, and web based account and domain administration,
+including domain-level access control for delegated domain management.
+Based on Exim MTA, Dovecot IMAP server, MySQL, Perl, Clamav, SpamAssassin,
+Roundcube webmail.
 
 
 1. Features
