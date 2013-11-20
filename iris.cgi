@@ -1,48 +1,51 @@
 #!/usr/bin/perl -Tw
 
-# version 0.6.2
+# version 0.9
 
 # the inactivity period in seconds after which user must re-authenticate
 my $inactivity_period = 1200;
 # the IPs the superuser privileged accounts can login from
 # just leave the list empty to disable the check
 my @superuser_allowed_ip;
-@superuser_allowed_ip = qw(192.168.1.5 10.0.20.40);
-my $mysql_host = 'localhost;mysql_socket=/tmp/mysql.sock41';
+#@superuser_allowed_ip = qw(192.168.1.5 10.0.20.40);
+my $mysql_host = 'localhost;mysql_socket=/tmp/mysql.sock';
 my $mysql_db   = 'mail';
 my $mysql_user = 'iris';
-my $mysql_pwd  = 'password2';
+my $mysql_pwd  = '{{mysql_iris_password}}';
 my $imap_spool = '/var/imap';
-my $imap_default_quota = 50; # MB
+my $imap_default_quota = 200; # MB
 my $imap_pwd_len = 8;
 # generate pretty passwords 0/1
 my $pretty_pw  = 1;
 # uncomment if you want to use random device
 # used when pretty_pw is 0
-# use Urandom only - non-blocking random device
+# use non-blocking random device
 my $dev_random = '/dev/urandom';
 # when set to 1 the newly created domain is hidden from MTA
 # until "normal delivery" is enabled via web panel
 my $domain_is_non_local_by_default = 0;
-# send welcome mail to create mbox and set maildir quota
-# if set to 0 then maildirmake will be used to create mailbox
+# send welcome mail to create mailbox and set maildir quota
+# if set to 0 then maildirmake will be used to create mailbox (if set below)
+# Dovecot creates mailbox automatically at login
+# Courier IMAP requires maildirmake
 my $send_welcome_mail = 1;
 # or /bin/mail
 my $bin_mail   = '/usr/bin/mail';
 # sendmail is preferred method in case message is in utf-8
 my $sendmail   = '/usr/sbin/sendmail';
-# maildirmake is a must when $send_welcome_mail = 0
+# with Courier, maildirmake is a must when $send_welcome_mail = 0
 # and strongly recommended in case you want to create accounts
-# when domain has non-local delivery mode set  
+# when domain has non-local delivery mode set
 # otherwise mailbox will be created by first production email;
-# depending on IMAP server, the absence of IMAP folder most likely
-# results a MUA login failure until then
+# with Courier absence of IMAP folder will result a MUA login
+# failure until then
+# Dovecot is Ok without maildirmk
 my $maildirmk;
-$maildirmk     = '/usr/local/bin/maildirmake';
+#$maildirmk     = '/usr/local/bin/maildirmake';
 # used to recursively remove imap account maildir folder
 my $bin_rm     = '/bin/rm';
 # syslog facility
-my $syslog_facility = 'mail';
+my $syslog_facility = 'auth';
 # use UNIX socket to connect to syslog, 1 or 0
 my $syslog_unix = 1;
 my $welcome_subj = 'Test message';
@@ -51,7 +54,7 @@ my $welcome_text =
 It is safe to delete me.
 ";
 my $welcome_email_headers =
-"From: info\@domain.com
+"From: {{admin_email}}
 To: \$email_to
 Subject: $welcome_subj
 MIME-Version: 1.0
@@ -566,7 +569,7 @@ sub int2kib {
 sub sec2date {
 	my $d = shift;
 	return '' unless defined $d;
-    my ($sec, $min, $hour, $day, $mon, $year) = localtime($d);	
+    my ($sec, $min, $hour, $day, $mon, $year) = localtime($d);
 	if ($now - $d < 24*60*60) { # today
 		return sprintf("%02d:%02d", $hour, $min);
 	} else {
@@ -853,7 +856,7 @@ sub account_editor {
         $hs =~ s/\$admin_accounts/$u_admin_accounts/;
         $hs =~ s/\$admin_max_quota/$u_admin_max_quota/;
         $hs =~ s/\$admin_max_accounts/$u_admin_max_accounts/;
-        
+
         my $md = mysql_do(
             "select domain from domains where id in (select dom_id from managed_domains where acc_id = ?) order by domain",
             $id)->fetchall_arrayref();
@@ -1198,7 +1201,7 @@ sub create_accounts {
             $aa[1] = $imap_default_quota;
         }
         $total_quota += $aa[1];
-        
+
         # additional DBI bind values
         for (my $i = $#aa + 1; $i < 7; ++$i) {
             push @aa, undef;
@@ -1456,7 +1459,7 @@ sub get_cookie_name {
     return "iris_". md5_hex($me);
 }
 
-# get hmac key to hash cookie value with 
+# get hmac key to hash cookie value with
 sub get_hmac_key {
     my $cookie_value = shift;
     # mysql password is used as secret token
@@ -1619,7 +1622,7 @@ sub main {
 
     print_headers();
     mysql_connect();
- 
+
     # load user permissions
     ($user_id, $superuser, $admin_quota, $admin_accounts, $admin_max_quota, $admin_max_accounts) =
         mysql_single_row(
@@ -1656,7 +1659,7 @@ sub main {
         exit(0);
     }
     # create a hash: id -> domain; domain -> id
-    # [0] is id, [1] is domain name    
+    # [0] is id, [1] is domain name
     map { $managed_domains->{$_->[1]} = $_->[0] } @$domains;
    #map { $managed_domains->{$_->[0]} = $_->[1]; $managed_domains->{$_->[1]} = $_->[0] } @$domains;
     if ($debug) {
@@ -1701,7 +1704,7 @@ sub main {
     print $html_domains;
 
     # for destructive actions allow POST method only
-    if (!$post && 
+    if (!$post &&
         !exists $cgi_data->{edit_account} &&
         !(exists $cgi_data->{domain_action} && $cgi_data->{domain_action} eq 'Show')) {
         print $html_end;

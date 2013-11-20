@@ -1,3 +1,12 @@
+0.9
+- No major changes are made to iris.cgi. Perl 5.18 is supported now.
+- Create new table 'expires' in database, see iris.sql.
+- Main features of the release are Dovecot, Roundcube webmail, and Vagrant and
+  Ansible provisioning procedure.
+- For transparent migration from Courier to Dovecot enable "INBOX." namespace in
+  dovecot.conf. http://wiki2.dovecot.org/Migration/Courier
+
+
 0.6.2
 - Update iris.cgi
 - In this version iris.cgi will use UTF-8 MySQL connection settings to write to
@@ -12,8 +21,10 @@ mysql> create database mail default character set utf8;
 mysql> use mail
 mysql> \. mysql-utf8.sql
 
+
 0.6.1
 - update iris.cgi and exim.conf
+
 
 0.6
 - update iris.cgi, qwatch.pl, and exim.conf

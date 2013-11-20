@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
-my $log_file = '/var/log/exim4/mainlog';
-my $imap_spool = '/var/imap';
+my $log_file = '{{exim_log_dir}}/mainlog';
+my $imap_spool = '{{imap_dir}}';
 my $log_poll_interval = 30;
 my $mbox_recheck_interval = 300;
 my $over_quota_str = 'defer (-22): mailbox is full (MTA-imposed quota exceeded while writing to';
@@ -9,10 +9,10 @@ my $over_quota_str = 'defer (-22): mailbox is full (MTA-imposed quota exceeded w
 my $too_big_str = ': message too big: ';
 # forget about "too big messages" every N seconds and start from scratch
 my $too_big_reset = 10000;
-my $mysql_host = 'localhost;mysql_socket=/tmp/mysql.sock41';
+my $mysql_host = 'localhost;mysql_socket=/tmp/mysql.sock';
 my $mysql_db   = 'mail';
 my $mysql_user = 'iris';
-my $mysql_pwd  = 'password2';
+my $mysql_pwd  = '{{mysql_iris_password}}';
 
 my $debug = 0;
 
@@ -109,7 +109,7 @@ sub set_asmtp_off {
     }
     print "read from db:\n". Dumper(\%to_check) if $debug;
     mysql_disconnect();
-    
+
     my $last_check_time = 0;
     my $last_big_reset = time();
     while (1) {

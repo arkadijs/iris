@@ -1,0 +1,400 @@
+---
+# An Ansible playbook to setup Iris on a FreeBSD box.
+# Consult Vagrantfile and boostrap.sh for prereqisites.
+- hosts: all
+  gather_facts: no
+  sudo: yes
+
+  vars:
+    ansible_python_interpreter: /usr/local/bin/python
+
+    mysql_root_password: password0
+    # also in exim.conf
+    mysql_mail_password: password1
+    mysql_iris_password: password2
+    mysql_rcub_password: password3
+
+    prefix: /usr/local/
+    etc: "{{prefix}}etc"
+
+    ssl_dir: "{{etc}}"
+
+    exim_conf_dir: "{{etc}}/exim"
+    exim_conf_file: configure
+    exim_spool: /var/spool/exim # drwxr-x--- mailnull:mail on FreeBSD
+    exim_log_dir: /var/log/exim
+    exim_user: mailnull
+    exim_group: mail # unused, exim is operated under 'mail' group, which is also a supplementary group for clamav
+    exim_vacation_user: smmsp
+    exim_vacation_group: mail # unused
+    exim_vacation_dir_group: mailnull
+    # also in exim.conf
+    primary_hostname: mailhub
+    primary_domain: domain.com
+    fqdn: "{{primary_hostname}}.{{primary_domain}}"
+    ip: 192.168.33.10 # you may put a 0.0.0.0 here to bind services to all interfaces and be independent of IP
+    admin_email: you@domain.com
+
+    imap_dir: /var/imap
+    dovecot_conf_dir: "{{etc}}/dovecot"
+    imapproxy_conf_dir: "{{etc}}"
+    clamav_conf_dir: "{{etc}}"
+    nginx_conf_dir: "{{etc}}/nginx"
+    php_conf_dir: "{{etc}}"
+    www_dir: /www
+    web_dir: "{{www_dir}}/{{fqdn}}"
+    rcub_dir: "{{web_dir}}/rc"
+    rcub_dist: http://netcologne.dl.sourceforge.net/project/roundcubemail/roundcubemail/0.9.5/roundcubemail-0.9.5.tar.gz
+    rcub_vacation_dir: "{{rcub_dir}}/plugins/vacation"
+    rcub_vacation_dist: https://github.com/bhuisgen/rc-vacation/archive/master.tar.gz
+    bin_dir: "{{prefix}}bin"
+    sbin_dir: "{{prefix}}sbin"
+
+  tasks:
+    # - name: update loader.conf
+    #   lineinfile: dest=/boot/loader.conf regexp=^({{item.tunable}})= line='{{item.tunable}}="{{item.value}}"'
+    #   with_items:
+    #   - { tunable: vm.kmem_size, value: 512M }
+    #   - { tunable: vm.kmem_size_max, value: 512M }
+    #   - { tunable: vfs.zfs.arc_max, value: 128M }
+    #   - { tunable: vfs.zfs.vdev.cache.size, value: 8M }
+
+    - name: install packages
+      pkgng: name={{item}} state=present
+      with_items:
+      - boost-jam
+      - boost-libs
+      - clucene
+      - clamav
+      - fcgiwrap
+      - git
+      - libspf2
+      - memcached
+      - mysql55-server
+      - openssl
+      - p5-CGI-Lite
+      - p5-DBD-mysql
+      - p5-Digest-HMAC
+      - p5-Mail-SpamAssassin
+      - pecl-memcache
+      - php5
+      - php5-extensions
+      - php5-exif
+      - php5-fileinfo
+      - php5-mbstring
+      - php5-mcrypt
+      - php5-openssl
+      - php5-pdo_mysql
+      - py27-MySQLdb
+      - spawn-fcgi
+      - up-imapproxy
+      - xcache
+
+    - name: compile Dovecot with MySQL and CLucene
+      command: make WITH_LUCENE=yes WITH_MYSQL=yes -DBATCH install clean chdir=/usr/ports/mail/dovecot2 creates=/usr/local/sbin/dovecot
+
+    - name: compile Exim with MySQL and SPF
+      command: make WITH_MYSQL=yes WITH_SPF=yes -DBATCH install clean chdir=/usr/ports/mail/exim creates=/usr/local/sbin/exim
+
+    - name: compile Nginx with SSL and SPDY
+      command: make WITH_SPDY=yes -DBATCH install clean chdir=/usr/ports/www/nginx creates=/usr/local/sbin/nginx
+
+    - name: create self-signed SSL cert
+      command: >
+        openssl req -new -nodes -x509 -days 10000
+        -subj "/C=US/ST=Oregon/L=Portland/O=IT/CN={{primary_hostname}}.{{primary_domain}}"
+        -keyout {{ssl_dir}}/mail.key -out {{ssl_dir}}/mail.crt -extensions v3_cami,
+        creates={{ssl_dir}}/mail.crt
+    - name: setup SSL key permissions
+      file: dest={{ssl_dir}}/mail.key mode=0600
+
+    - name: disable MySQL TCP listener
+      ini_file: dest=/var/db/mysql/my.cnf section=mysqld option=bind-address value=127.0.0.1 mode=0640 owner=mysql
+    # - meta: flush_handlers
+    - name: enable MySQL
+      lineinfile: dest=/etc/rc.conf line='mysql_enable="YES"'
+    - name: start MySQL service
+      service: name=mysql-server state=started
+    - name: update MySQL root password
+      mysql_user: name=root host=localhost password={{mysql_root_password}}
+
+    - name: install ~root/.my.cnf
+      ini_file: dest=/root/.my.cnf section=client option=password value={{mysql_root_password}} mode=0600 owner=root
+    - name: create/drop MySQL databases
+      mysql_db: login_user=root login_password={{mysql_root_password}} name=test state=absent
+    - mysql_db: login_user=root login_password={{mysql_root_password}} name=mail encoding=utf8
+    - mysql_db: login_user=root login_password={{mysql_root_password}} name=roundcubemail encoding=utf8
+    - name: drop MySQL users
+      mysql_user: name={{item}} state=absent
+      with_items:
+      - mail
+      - iris
+      - roundcube
+    - name: only root@localhost in MySQL
+      command: >
+        mysql mysql -e "delete from user where not (user = 'root' and host = 'localhost'); flush privileges;"
+    - name: create 'mail' MySQL user
+      mysql_user: state=present name=mail password={{mysql_mail_password}} priv=mail.*:select
+    - name: create 'iris' MySQL user
+      mysql_user: state=present name=iris password={{mysql_iris_password}} priv=mail.*:all
+    - name: create 'roundcube' MySQL user
+      mysql_user: state=present name=roundcube password={{mysql_rcub_password}} priv=roundcubemail.*:all
+    - name: upload Iris database schema creation script
+      copy: src=iris.sql dest=/tmp/
+    - name: create 'mail' database tables
+      command: mysql mail -e '\. /tmp/iris.sql' creates=/var/db/mysql/mail/accounts.frm
+
+    - name: install main Exim config
+      template: src=exim.conf dest={{exim_conf_dir}}/{{exim_conf_file}} owner=root mode=0600 backup=yes
+    - name: install additional Exim config directories
+      file: state=directory path={{exim_conf_dir}}/{{item}} owner=root group=0
+      with_items:
+      - aliases
+      - tabs
+    - name: install Exim lists
+      file: state=touch path={{exim_conf_dir}}/{{item}} owner=root group=0 mode=0644
+      with_items:
+      - tabs/host-reject
+      - tabs/ignore-dnsbl-hosts
+      - tabs/relay-domains
+      - tabs/relay-from-hosts
+
+    - name: create Exim local-domains list
+      copy: |
+        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/tabs/local-domains content="{{primary_hostname}}.{{primary_domain}}
+        {{primary_domain}}
+        "
+
+    - name: create Exim global aliases
+      copy: |
+        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/aliases.global content="mailer-daemon: postmaster
+        postmaster: root
+        abuse: root
+        nobody: /dev/null
+        "
+
+    - name: create Exim aliases for {{primary_hostname}}.{{primary_domain}}
+      copy: |
+        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/aliases/{{primary_hostname}}.{{primary_domain}} content="operator: root
+        exim: root
+        mysql: root
+        www: /dev/null
+        mailer-daemon: /dev/null
+        dovecot: /dev/null
+        clamav: root
+        admin: root
+        root: root@{{primary_domain}}
+        "
+
+    - name: create Exim aliases for {{primary_domain}}
+      copy: |
+        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/aliases/{{primary_domain}} content="certs: root
+        null: /dev/null
+        root: {{admin_email}}
+        "
+
+    # g+s on directory is not required on FreeBSD for files to receive the group ownership, but let it be documented here
+    # the reason for over-complicated setup is that 'mailnull' (primary Exim user) cron could manipulate vacation dir content
+    # (a) no separate crontab for 'smmsp' is required and (b) no permission for 'smmsp' on spool dir
+    - name: create Exim vacation directory
+      file: dest={{exim_spool}}/vacation state=directory owner={{exim_vacation_user}} group={{exim_vacation_dir_group}} mode=2775
+
+    - name: let keep more exim logs
+      lineinfile: dest=/usr/local/sbin/exicyclog regexp=^keep= line='keep=20'
+
+    - name: quiet Exim tidydb
+      lineinfile: dest=/usr/local/etc/periodic/daily/150.exim-tidydb regexp='^(.*db_name")\s*$' line='\1 >/dev/null' backrefs=yes
+
+    - name: quiet FreeBSD periodics
+      copy: |
+        dest=/etc/periodic.conf content='exim_status_mail_rejects_enable="NO"
+        daily_status_mailq_enable="NO"
+        daily_clean_hoststat_enable="NO"
+        '
+    - name: setting up vacation cleanup crontab
+      cron: name=vacation user=mailnull minute=2 hour=1 day=*/10 job='find /var/spool/exim/vacation -mtime +30 -a -type f -print0 | xargs -0 rm'
+
+    - name: setting up exim log rotation crontab
+      cron: name=exicyclog minute=7 hour=1 weekday=7 job=/usr/local/sbin/exicyclog
+
+    - name: setting up daily crontabs
+      cron: name=daily.{{item.mi}} minute={{item.mi}} hour=1 job='{{item.cmd}}'
+      with_items:
+      - { mi: 3, cmd: 'echo "delete from greylist where record_expires < now();" | /usr/local/bin/mysql mail' }
+      - { mi: 4, cmd: '/usr/local/bin/doveadm expunge -A mailbox Trash savedbefore 30d' }
+      - { mi: 5, cmd: '/usr/local/bin/doveadm expunge -A mailbox Spam  savedbefore 30d' }
+      - { mi: 6, cmd: '/usr/local/bin/doveadm expunge -A mailbox Junk  savedbefore 30d' }
+      - { mi: 8, cmd: '/usr/sbin/ntpdate pool.ntp.org >/dev/null' }
+
+    - name: disable Sendmail
+      lineinfile: dest=/etc/rc.conf line='sendmail_enable="NONE"'
+    - service: name=sendmail state=stopped
+    - name: set Exim as system sendmail, mailq
+      copy: src=config/mailer.conf dest=/etc/mail/ owner=root group=0 mode=0644
+    - name: enable Exim
+      lineinfile: dest=/etc/rc.conf line='exim_enable="YES"'
+    - name: set Exim flags
+      lineinfile: dest=/etc/rc.conf line='exim_flags="-bd -q1m"'
+    - service: name=exim state=started
+
+    - name: install Dovecot config
+      template: src={{item}} dest={{dovecot_conf_dir}}/ owner=root group=0 mode=0600
+      with_fileglob:
+      - config/dovecot*.conf
+    - name: setup Imap directory
+      file: state=directory path={{imap_dir}} owner=dovecot group=dovecot mode=0750
+    - name: enable Dovecot
+      lineinfile: dest=/etc/rc.conf line='dovecot_enable="YES"'
+    # dovecot service locks ansible provisioning
+    #- service: name=dovecot state=started
+
+    - name: install imapproxy config
+      copy: src=config/imapproxyd.conf dest={{imapproxy_conf_dir}}/ owner=root group=0 mode=0644
+    - name: enable imapproxyd
+      lineinfile: dest=/etc/rc.conf line='imapproxyd_enable="YES"'
+    - name: make imapproxyd startup depends on dovecot
+      lineinfile: dest=/usr/local/etc/rc.d/imapproxyd regexp='^(# REQUIRE. DAEMON).*' line='\1 dovecot' backrefs=yes
+    # depends on dovecot
+    #- service: name=imapproxyd state=started
+
+    - name: enable Memcached
+      lineinfile: dest=/etc/rc.conf line='memcached_enable="YES"'
+    - name: set Memcached flags
+      lineinfile: dest=/etc/rc.conf line='memcached_flags="-l 127.0.0.1"'
+    - service: name=memcached state=started
+
+    - name: enable SpamAssassin
+      lineinfile: dest=/etc/rc.conf line='spamd_enable="YES"'
+    - name: set SpamAssassin flags
+      lineinfile: dest=/etc/rc.conf line='spamd_flags="-x -u spamd -H /var/spool/spamd"'
+    - name: update SpamAssassin rules from internet
+      command: sa-update creates=/var/db/spamassassin
+    - service: name=sa-spamd state=started
+
+    - name: add clamav user to mail group, for content scan
+      user: name=clamav append=yes groups=mail
+
+    - name: add dovecot user to mail group, for qwatch
+      user: name=dovecot append=yes groups=mail
+
+    - name: install Freshclam config
+      template: src=config/freshclam.conf dest={{clamav_conf_dir}}/ owner=root group=0 mode=0640
+    - name: enable Freshclam
+      lineinfile: dest=/etc/rc.conf line='clamav_freshclam_enable="YES"'
+    - name: kill Freshclam process if any
+      shell: killall freshclam; exit 0
+    - name: update Clamav database from internet
+      command: freshclam creates=/var/db/clamav/daily.cvd # .cld if compiled with LLVM
+    - service: name=clamav-freshclam state=started
+
+    - name: install Clamav config
+      copy: src=config/clamd.conf dest={{clamav_conf_dir}}/ owner=root group=clamav mode=0640
+    - name: enable Clamav
+      lineinfile: dest=/etc/rc.conf line='clamav_clamd_enable="YES"'
+    - service: name=clamav-clamd state=started
+
+    - name: install Nginx config
+      template: src=config/nginx.conf dest={{nginx_conf_dir}}/ owner=root group=0 mode=0640
+    - name: setup Nginx logs
+      file: state=directory path=/var/log/nginx owner=root group=0
+    - name: setup PHP logs
+      file: state=touch path=/var/log/nginx/php.log owner=root group=www mode=0664
+    - name: enable Nginx
+      lineinfile: dest=/etc/rc.conf line='nginx_enable="YES"'
+    - service: name=nginx state=started
+
+    - name: install PHP config
+      copy: src=config/php.ini dest={{php_conf_dir}}/ owner=root group=0 mode=0640
+    - name: install Xcache config
+      copy: src=config/xcache.ini dest={{php_conf_dir}}/php/ owner=root group=0 mode=0640
+
+    - name: create rc.local
+      file: dest=/etc/rc.local state=touch
+
+    - name: setup PHP and CGI in rc.local
+      file: dest=/etc/rc.local state=touch
+    - name: socket cleanup
+      lineinfile: dest=/etc/rc.local line='rm -f /tmp/{php,cgi}.sock'
+    - name: add CGI startup
+      lineinfile: dest=/etc/rc.local line='env - LC_CTYPE=en_US.UTF-8 PATH=/www/bin PHP_FCGI_MAX_REQUESTS=1000 FCGI_WEB_SERVER_ADDRS=127.0.0.1 /usr/local/bin/spawn-fcgi -M 0770 -u www -g www -C 10 -f /usr/local/bin/php-cgi -s /tmp/php.sock >> /var/log/nginx/error.log 2>&1'
+    - name: add PHP startup
+      lineinfile: dest=/etc/rc.local line='env - LC_CTYPE=en_US.UTF-8 PATH=/www/bin FCGI_WEB_SERVER_ADDRS=127.0.0.1 /usr/local/bin/spawn-fcgi -M 0770 -u dovecot -g dovecot -f "/usr/local/sbin/fcgiwrap -c 3" -s /tmp/cgi.sock >> /var/log/nginx/error.log 2>&1'
+    - name: fix CGI socket permissions
+      lineinfile: dest=/etc/rc.local line='chown :www /tmp/cgi.sock'
+
+    - name: install qwatch
+      template: src={{item}} dest={{sbin_dir}}/ owner=root group=dovecot mode=0750
+      with_fileglob:
+        - qwatch.*
+    - name: enable qwatch
+      # sleep is to let mysqld start
+      lineinfile: dest=/etc/rc.local line='su -m dovecot -c "sleep 20; /usr/local/sbin/qwatch.sh &" &'
+
+    - name: install Iris directory
+      file: state=directory path={{www_dir}}/{{fqdn}}/control-panel owner=www group=dovecot mode=0550
+    - name: install iris.cgi
+      copy: src=iris.cgi dest={{www_dir}}/{{fqdn}}/control-panel/index.cgi owner=root group=dovecot mode=0750
+    # template/lineinfile modules corrupts Perl source
+    - name: modify iris.cgi config - mysql password, ignore Legacy variable subsitution warning, if any
+      command: perl -pi -e s/\{\{mysql_iris_password\}\}/{{mysql_iris_password}}/ {{www_dir}}/{{fqdn}}/control-panel/index.cgi
+    - name: modify iris.cgi config - primary_domain, ignore Legacy variable subsitution warning, if any
+      command: perl -pi -e s/\{\{admin_email\}\}/{{admin_email}}/ {{www_dir}}/{{fqdn}}/control-panel/index.cgi
+
+    - name: install robots.txt
+      copy: |
+        owner=root group=0 dest={{web_dir}}/robots.txt content='User-agent: *
+        Disallow: /
+        '
+    - name: install Roundcube webmail
+      file: state=directory path={{rcub_dir}} owner=root group=www mode=0750
+    - name: download Roundcube webmail from Sourceforge
+      shell: creates={{rcub_dir}}/INSTALL curl -s {{rcub_dist}} | tar xzo -C {{rcub_dir}} --strip-components 1 -f -
+    - name: install Roundcube vacation plugin
+      file: state=directory path={{rcub_vacation_dir}} owner=root group=www mode=0750
+    - name: download Roundcube vacation plugin from Github
+      shell: creates={{rcub_vacation_dir}}/INSTALL curl -s {{rcub_vacation_dist}} | tar xzo -C {{rcub_vacation_dir}}/ --strip-components 1 -f -
+    - name: setup Roundcube error log
+      file: state=touch path={{rcub_dir}}/logs/errors owner=root group=www mode=0620
+    - name: setup Roundcube sendmail log
+      file: state=touch path={{rcub_dir}}/logs/sendmail owner=root group=www mode=0620
+    - name: setup Roundcube logs directory # not strictly necessary but Roundcube installer complains
+      file: state=directory path={{rcub_dir}}/logs group=www mode=0770
+    - name: setup Roundcube temp directory
+      file: state=directory path={{rcub_dir}}/temp group=www mode=0770
+    - name: setup Roundcube main config
+      copy: src=config/main.inc.php dest={{rcub_dir}}/config owner=root group=www
+    - name: setup Roundcube db config
+      template: src=config/db.inc.php dest={{rcub_dir}}/config owner=root group=www mode=0660
+    - name: setup Roundcube vacation plugin config
+      template: src=config/vacation-config.inc.php dest={{rcub_vacation_dir}}/config.inc.php owner=root group=www mode=0660
+
+    - name: setup Autodiscover web directory
+      file: state=directory path={{web_dir}}/Autodiscover
+    - name: install Autodiscover config
+      template: src=config/Autodiscover.xml dest={{web_dir}}/Autodiscover/Autodiscover.xml owner=root group=0
+
+    - name: setup Autoconfig web directory
+      file: state=directory path={{www_dir}}/autoconfig.{{primary_domain}}/mail
+    - name: install Autoconfig config
+      template: src=config/config-v1.1.xml dest={{www_dir}}/autoconfig.{{primary_domain}}/mail/config-v1.1.xml owner=root group=0
+
+
+  handlers:
+    - name: restart MySQL
+      service: name=mysql-server state=restarted
+    - name: restart Exim
+      service: name=mysql-server state=restarted
+    - name: restart Dovecot
+      service: name=dovecot state=started
+    - name: restart imapproxyd
+      service: name=imapproxyd state=started
+    - name: restart Memcached
+      service: name=memcached state=started
+    - name: restart SpamAssassin
+      service: name=sa-spamd state=started
+    - name: restart Freshclam
+      service: name=clamav-freshclam state=started
+    - name: restart Clamav
+      service: name=clamav-clamd state=started
+    - name: restart Nginx
+      service: name=nginx state=started

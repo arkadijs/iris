@@ -48,6 +48,13 @@ CREATE TABLE `domains` (
   UNIQUE KEY `domain` (`domain`)
 );
 
+CREATE TABLE `managed_domains` (
+  `acc_id` int(11) NOT NULL default '0',
+  `dom_id` int(11) NOT NULL default '0',
+  KEY `admin_domains` (`acc_id`),
+  KEY `domain_admins` (`dom_id`)
+);
+
 CREATE TABLE `greylist` (
   `id` int(11) NOT NULL auto_increment,
   `relay_ip` varchar(64) default NULL,
@@ -60,12 +67,12 @@ CREATE TABLE `greylist` (
   KEY `relay_ip` (`relay_ip`(15),`from_domain`(20))
 );
 
-CREATE TABLE `managed_domains` (
-  `acc_id` int(11) NOT NULL default '0',
-  `dom_id` int(11) NOT NULL default '0',
-  KEY `admin_domains` (`acc_id`),
-  KEY `domain_admins` (`dom_id`)
+CREATE TABLE `expires` (
+  `username` varchar(100) NOT NULL,
+  `mailbox` varchar(255) NOT NULL,
+  `expire_stamp` int(11) NOT NULL,
+  PRIMARY KEY (`username`,`mailbox`)
 );
 
-insert into domains (id, domain) values (1, 'admin.domain');
-insert into accounts (id, account, pwd, superuser, local_part, domain) values (1, 'admin', 'superuserpassword', 1, 'admin', 'admin.domain');
+insert into domains (id, domain) values (1, 'admin.local');
+insert into accounts (id, account, pwd, superuser, local_part, domain) values (1, 'admin', 'superuserpassword', 1, 'admin', 'admin.local');

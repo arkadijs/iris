@@ -1,3 +1,8 @@
+0.9
+- Use Dovecot instead of Courier IMAP.
+- Use Roundcube webmail instead of SquirrelMail.
+- Vagrant and Ansible provisioning scripts.
+
 0.6.2
 - Correct quota display when units hits GB
 - Fix SquirrelMail and Exim to use UTF-8 for vacation messages
@@ -34,7 +39,7 @@
 - AV/spam/over-quota SMTP time rejection is implemented, along with UTF-8 clean
   vacation and welcome messages, various enhancements to Web-interface, and
   real-time over-quota monitor.
-  
+
 0.3
 - Authenticated SMTP relay and vacation message features have been implemented.
 
