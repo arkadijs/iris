@@ -70,7 +70,7 @@ There are two alternatives:
 - installation using Vagrant and Ansible to create complete VM.
 
 As for the later: install Vagrant, Ansible, VirtualBox. Execute
-$ vagrant up
+$ vagrant up --provision
 in iris/ (this) folder to download base box (a Vagrant name for minimal prepared
 VM image), and provision it with Ansible. The portsnap stage is a little bit
 slow, but installation requires to build some ports with specific features.
@@ -79,13 +79,20 @@ After provisioning procedure successfully completes, please restart the VM with
 $ vagrant reload
 to apply new kernel parameters and start all services.
 
+Open https://192.168.33.10/rc/installer/ in a browser to initialize Roundcube
+database on the Installer wizard second screen.
+After webmail is configured, ssh to the box
+$ vagrant ssh
+and run
+$ sudo chmod 0700 /www/mailhub.domain.com/rc/installer
+
 Visit:
-https://192.168.33.10/rc/installer/ in a browser to initialize Roundcube database.
-https://192.168.33.10/control-panel/ (mail administration panel)
+https://192.168.33.10/control-panel (mail administration panel)
+user/pass: admin/superuserpassword
+
 https://192.168.33.10/rc (webmail)
+
 Connect your IMAP client to 192.168.33.10:993
-After webmail is configured, login as root and
-$ chmod 0700 /www/mailhub.domain.com/rc/installer
 
 Below are manual installation instructions.
 If the instructions are unclear, then take a look at playbook.yml.

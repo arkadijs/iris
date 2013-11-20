@@ -9,9 +9,8 @@
     ansible_python_interpreter: /usr/local/bin/python
 
     mysql_root_password: password0
-    # also in exim.conf
     mysql_mail_password: password1
-    mysql_iris_password: password2
+    mysql_iris_password: password2 # escape @, %, $ with \\ - see admin_email below
     mysql_rcub_password: password3
 
     prefix: /usr/local/
@@ -28,12 +27,11 @@
     exim_vacation_user: smmsp
     exim_vacation_group: mail # unused
     exim_vacation_dir_group: mailnull
-    # also in exim.conf
     primary_hostname: mailhub
     primary_domain: domain.com
     fqdn: "{{primary_hostname}}.{{primary_domain}}"
     ip: 192.168.33.10 # you may put a 0.0.0.0 here to bind services to all interfaces and be independent of IP
-    admin_email: you@domain.com
+    admin_email: you\\@domain.com # \\@ is required due to Perl
 
     imap_dir: /var/imap
     dovecot_conf_dir: "{{etc}}/dovecot"
@@ -102,8 +100,8 @@
     - name: create self-signed SSL cert
       command: >
         openssl req -new -nodes -x509 -days 10000
-        -subj "/C=US/ST=Oregon/L=Portland/O=IT/CN={{primary_hostname}}.{{primary_domain}}"
-        -keyout {{ssl_dir}}/mail.key -out {{ssl_dir}}/mail.crt -extensions v3_cami,
+        -subj "/C=US/ST=Oregon/L=Portland/O=IT/CN={{fqdn}}"
+        -keyout {{ssl_dir}}/mail.key -out {{ssl_dir}}/mail.crt -extensions v3_ca
         creates={{ssl_dir}}/mail.crt
     - name: setup SSL key permissions
       file: dest={{ssl_dir}}/mail.key mode=0600
@@ -140,12 +138,12 @@
     - name: create 'roundcube' MySQL user
       mysql_user: state=present name=roundcube password={{mysql_rcub_password}} priv=roundcubemail.*:all
     - name: upload Iris database schema creation script
-      copy: src=iris.sql dest=/tmp/
+      copy: src=../iris.sql dest=/tmp/
     - name: create 'mail' database tables
       command: mysql mail -e '\. /tmp/iris.sql' creates=/var/db/mysql/mail/accounts.frm
 
     - name: install main Exim config
-      template: src=exim.conf dest={{exim_conf_dir}}/{{exim_conf_file}} owner=root mode=0600 backup=yes
+      template: src=../exim.conf dest={{exim_conf_dir}}/{{exim_conf_file}} owner=root mode=0600 backup=yes
     - name: install additional Exim config directories
       file: state=directory path={{exim_conf_dir}}/{{item}} owner=root group=0
       with_items:
@@ -161,7 +159,7 @@
 
     - name: create Exim local-domains list
       copy: |
-        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/tabs/local-domains content="{{primary_hostname}}.{{primary_domain}}
+        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/tabs/local-domains content="{{fqdn}}
         {{primary_domain}}
         "
 
@@ -173,9 +171,9 @@
         nobody: /dev/null
         "
 
-    - name: create Exim aliases for {{primary_hostname}}.{{primary_domain}}
+    - name: create Exim aliases for {{fqdn}}
       copy: |
-        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/aliases/{{primary_hostname}}.{{primary_domain}} content="operator: root
+        owner=root group=0 mode=0644 dest={{exim_conf_dir}}/aliases/{{fqdn}} content="operator: root
         exim: root
         mysql: root
         www: /dev/null
@@ -199,7 +197,7 @@
     - name: create Exim vacation directory
       file: dest={{exim_spool}}/vacation state=directory owner={{exim_vacation_user}} group={{exim_vacation_dir_group}} mode=2775
 
-    - name: let keep more exim logs
+    - name: let keep more Exim logs
       lineinfile: dest=/usr/local/sbin/exicyclog regexp=^keep= line='keep=20'
 
     - name: quiet Exim tidydb
@@ -214,7 +212,7 @@
     - name: setting up vacation cleanup crontab
       cron: name=vacation user=mailnull minute=2 hour=1 day=*/10 job='find /var/spool/exim/vacation -mtime +30 -a -type f -print0 | xargs -0 rm'
 
-    - name: setting up exim log rotation crontab
+    - name: setting up Exim log rotation crontab
       cron: name=exicyclog minute=7 hour=1 weekday=7 job=/usr/local/sbin/exicyclog
 
     - name: setting up daily crontabs
@@ -230,7 +228,7 @@
       lineinfile: dest=/etc/rc.conf line='sendmail_enable="NONE"'
     - service: name=sendmail state=stopped
     - name: set Exim as system sendmail, mailq
-      copy: src=config/mailer.conf dest=/etc/mail/ owner=root group=0 mode=0644
+      copy: src=../config/mailer.conf dest=/etc/mail/ owner=root group=0 mode=0644
     - name: enable Exim
       lineinfile: dest=/etc/rc.conf line='exim_enable="YES"'
     - name: set Exim flags
@@ -240,7 +238,7 @@
     - name: install Dovecot config
       template: src={{item}} dest={{dovecot_conf_dir}}/ owner=root group=0 mode=0600
       with_fileglob:
-      - config/dovecot*.conf
+      - ../config/dovecot*.conf
     - name: setup Imap directory
       file: state=directory path={{imap_dir}} owner=dovecot group=dovecot mode=0750
     - name: enable Dovecot
@@ -249,7 +247,7 @@
     #- service: name=dovecot state=started
 
     - name: install imapproxy config
-      copy: src=config/imapproxyd.conf dest={{imapproxy_conf_dir}}/ owner=root group=0 mode=0644
+      copy: src=../config/imapproxyd.conf dest={{imapproxy_conf_dir}}/ owner=root group=0 mode=0644
     - name: enable imapproxyd
       lineinfile: dest=/etc/rc.conf line='imapproxyd_enable="YES"'
     - name: make imapproxyd startup depends on dovecot
@@ -278,7 +276,7 @@
       user: name=dovecot append=yes groups=mail
 
     - name: install Freshclam config
-      template: src=config/freshclam.conf dest={{clamav_conf_dir}}/ owner=root group=0 mode=0640
+      template: src=../config/freshclam.conf dest={{clamav_conf_dir}}/ owner=root group=0 mode=0640
     - name: enable Freshclam
       lineinfile: dest=/etc/rc.conf line='clamav_freshclam_enable="YES"'
     - name: kill Freshclam process if any
@@ -288,13 +286,13 @@
     - service: name=clamav-freshclam state=started
 
     - name: install Clamav config
-      copy: src=config/clamd.conf dest={{clamav_conf_dir}}/ owner=root group=clamav mode=0640
+      copy: src=../config/clamd.conf dest={{clamav_conf_dir}}/ owner=root group=clamav mode=0640
     - name: enable Clamav
       lineinfile: dest=/etc/rc.conf line='clamav_clamd_enable="YES"'
     - service: name=clamav-clamd state=started
 
     - name: install Nginx config
-      template: src=config/nginx.conf dest={{nginx_conf_dir}}/ owner=root group=0 mode=0640
+      template: src=../config/nginx.conf dest={{nginx_conf_dir}}/ owner=root group=0 mode=0640
     - name: setup Nginx logs
       file: state=directory path=/var/log/nginx owner=root group=0
     - name: setup PHP logs
@@ -304,9 +302,9 @@
     - service: name=nginx state=started
 
     - name: install PHP config
-      copy: src=config/php.ini dest={{php_conf_dir}}/ owner=root group=0 mode=0640
+      copy: src=../config/php.ini dest={{php_conf_dir}}/ owner=root group=0 mode=0640
     - name: install Xcache config
-      copy: src=config/xcache.ini dest={{php_conf_dir}}/php/ owner=root group=0 mode=0640
+      copy: src=../config/xcache.ini dest={{php_conf_dir}}/php/ owner=root group=0 mode=0640
 
     - name: create rc.local
       file: dest=/etc/rc.local state=touch
@@ -325,7 +323,7 @@
     - name: install qwatch
       template: src={{item}} dest={{sbin_dir}}/ owner=root group=dovecot mode=0750
       with_fileglob:
-        - qwatch.*
+        - ../qwatch.*
     - name: enable qwatch
       # sleep is to let mysqld start
       lineinfile: dest=/etc/rc.local line='su -m dovecot -c "sleep 20; /usr/local/sbin/qwatch.sh &" &'
@@ -333,11 +331,11 @@
     - name: install Iris directory
       file: state=directory path={{www_dir}}/{{fqdn}}/control-panel owner=www group=dovecot mode=0550
     - name: install iris.cgi
-      copy: src=iris.cgi dest={{www_dir}}/{{fqdn}}/control-panel/index.cgi owner=root group=dovecot mode=0750
+      copy: src=../iris.cgi dest={{www_dir}}/{{fqdn}}/control-panel/index.cgi owner=root group=dovecot mode=0750
     # template/lineinfile modules corrupts Perl source
     - name: modify iris.cgi config - mysql password, ignore Legacy variable subsitution warning, if any
       command: perl -pi -e s/\{\{mysql_iris_password\}\}/{{mysql_iris_password}}/ {{www_dir}}/{{fqdn}}/control-panel/index.cgi
-    - name: modify iris.cgi config - primary_domain, ignore Legacy variable subsitution warning, if any
+    - name: modify iris.cgi config - admin_email, ignore Legacy variable subsitution warning, if any
       command: perl -pi -e s/\{\{admin_email\}\}/{{admin_email}}/ {{www_dir}}/{{fqdn}}/control-panel/index.cgi
 
     - name: install robots.txt
@@ -352,7 +350,7 @@
     - name: install Roundcube vacation plugin
       file: state=directory path={{rcub_vacation_dir}} owner=root group=www mode=0750
     - name: download Roundcube vacation plugin from Github
-      shell: creates={{rcub_vacation_dir}}/INSTALL curl -s {{rcub_vacation_dist}} | tar xzo -C {{rcub_vacation_dir}}/ --strip-components 1 -f -
+      shell: creates={{rcub_vacation_dir}}/INSTALL curl -Ls {{rcub_vacation_dist}} | tar xzo -C {{rcub_vacation_dir}}/ --strip-components 1 -f -
     - name: setup Roundcube error log
       file: state=touch path={{rcub_dir}}/logs/errors owner=root group=www mode=0620
     - name: setup Roundcube sendmail log
@@ -362,21 +360,21 @@
     - name: setup Roundcube temp directory
       file: state=directory path={{rcub_dir}}/temp group=www mode=0770
     - name: setup Roundcube main config
-      copy: src=config/main.inc.php dest={{rcub_dir}}/config owner=root group=www
+      copy: src=../config/main.inc.php dest={{rcub_dir}}/config owner=root group=www
     - name: setup Roundcube db config
-      template: src=config/db.inc.php dest={{rcub_dir}}/config owner=root group=www mode=0660
+      template: src=../config/db.inc.php dest={{rcub_dir}}/config owner=root group=www mode=0660
     - name: setup Roundcube vacation plugin config
-      template: src=config/vacation-config.inc.php dest={{rcub_vacation_dir}}/config.inc.php owner=root group=www mode=0660
+      template: src=../config/vacation-config.inc.php dest={{rcub_vacation_dir}}/config.inc.php owner=root group=www mode=0660
 
     - name: setup Autodiscover web directory
       file: state=directory path={{web_dir}}/Autodiscover
     - name: install Autodiscover config
-      template: src=config/Autodiscover.xml dest={{web_dir}}/Autodiscover/Autodiscover.xml owner=root group=0
+      template: src=../config/Autodiscover.xml dest={{web_dir}}/Autodiscover/Autodiscover.xml owner=root group=0
 
     - name: setup Autoconfig web directory
       file: state=directory path={{www_dir}}/autoconfig.{{primary_domain}}/mail
     - name: install Autoconfig config
-      template: src=config/config-v1.1.xml dest={{www_dir}}/autoconfig.{{primary_domain}}/mail/config-v1.1.xml owner=root group=0
+      template: src=../config/config-v1.1.xml dest={{www_dir}}/autoconfig.{{primary_domain}}/mail/config-v1.1.xml owner=root group=0
 
 
   handlers:
