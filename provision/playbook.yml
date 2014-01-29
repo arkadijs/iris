@@ -6,7 +6,7 @@
   sudo: yes
 
   vars:
-    ansible_python_interpreter: /usr/local/bin/python
+    ansible_python_interpreter: /usr/local/bin/python2
 
     mysql_root_password: password0
     mysql_mail_password: password1
@@ -94,7 +94,10 @@
     - name: compile Exim with MySQL and SPF
       command: make WITH_MYSQL=yes WITH_SPF=yes -DBATCH install clean chdir=/usr/ports/mail/exim creates=/usr/local/sbin/exim
 
-    - name: compile Nginx with SSL and SPDY
+    - name: fix Nginx port to use OpenSSL from ports
+      lineinfile: dest=/usr/ports/www/nginx/Makefile regexp=^WITH_OPENSSL_BASE= line='WITH_OPENSSL_PORT=yes'
+
+    - name: compile Nginx with SSL
       command: make WITH_SPDY=yes -DBATCH install clean chdir=/usr/ports/www/nginx creates=/usr/local/sbin/nginx
 
     - name: create self-signed SSL cert
@@ -332,7 +335,7 @@
       file: state=directory path={{www_dir}}/{{fqdn}}/control-panel owner=www group=dovecot mode=0550
     - name: install iris.cgi
       copy: src=../iris.cgi dest={{www_dir}}/{{fqdn}}/control-panel/index.cgi owner=root group=dovecot mode=0750
-    # template/lineinfile modules corrupts Perl source
+    # template/lineinfile modules corrupts Perl source without 'legacy_playbook_variables = no' in ~/.ansible.cfg
     - name: modify iris.cgi config - mysql password, ignore Legacy variable subsitution warning, if any
       command: perl -pi -e s/\{\{mysql_iris_password\}\}/{{mysql_iris_password}}/ {{www_dir}}/{{fqdn}}/control-panel/index.cgi
     - name: modify iris.cgi config - admin_email, ignore Legacy variable subsitution warning, if any
@@ -381,7 +384,7 @@
     - name: restart MySQL
       service: name=mysql-server state=restarted
     - name: restart Exim
-      service: name=mysql-server state=restarted
+      service: name=exim state=restarted
     - name: restart Dovecot
       service: name=dovecot state=started
     - name: restart imapproxyd

@@ -74,7 +74,8 @@ As for the later: install Vagrant, Ansible, VirtualBox. Execute
 $ vagrant up --provision
 in iris/ (this) folder to download base box (a Vagrant name for minimal prepared
 VM image), and provision it with Ansible. The portsnap stage is a little bit
-slow, but installation requires to build some ports with specific features.
+slow, but this installation must build some ports with specific features.
+Server SSL certificate name and passwords are in provision/playbook.yml.
 
 After provisioning procedure successfully completes, please restart the VM with
 $ vagrant reload

@@ -20,9 +20,7 @@ if [ ! -f /tmp/freebsd-update ]; then
 	PAGER=/bin/cat sh -c '/tmp/freebsd-update install; exit 0'
 fi
 
-if [ -n "$do_portsnap" -a ! -f /tmp/portsnap ]; then
-	sed 's/\[ ! -t 0 \]/false/' /usr/sbin/portsnap >/tmp/portsnap
-	chmod +x /tmp/portsnap
+if [ -n "$do_portsnap" -a ! -d /usr/ports ]; then
 	if grep -q "REFUSE accessibility" /etc/portsnap.conf; then echo no portsnap.conf updates necessary; else
 		cat >>/etc/portsnap.conf <<EOF
 REFUSE accessibility arabic astro benchmarks biology cad
@@ -32,8 +30,8 @@ REFUSE palm polish portuguese russian ukrainian vietnamese
 #REFUSE x11 x11-clocks x11-drivers x11-fm x11-fonts x11-servers x11-themes x11-toolkits x11-wm
 EOF
 	fi
-	/tmp/portsnap fetch
-	if [ -f /usr/ports/.portsnap.INDEX ]; then /tmp/portsnap update; else /tmp/portsnap extract >/dev/null; fi
+	/usr/sbin/portsnap --interactive fetch
+	if [ -f /usr/ports/.portsnap.INDEX ]; then /usr/sbin/portsnap update; else /usr/sbin/portsnap extract >/dev/null; fi
 fi
 
 if grep -q "NO_PROFILE" /etc/make.conf; then echo no make.conf updates necessary; else
@@ -47,24 +45,8 @@ WITHOUT_NLS=1
 EOF
 fi
 
-if [ ! -f /usr/local/etc/pkg/repos/FreeBSD.conf ]; then
-	rm -rf /usr/local/etc/pkg*
-	mkdir -p /usr/local/etc/pkg/repos
-	cat >/usr/local/etc/pkg/repos/FreeBSD.conf <<EOF
-FreeBSD: {
-  url: "http://pkg.eu.FreeBSD.org/\${ABI}/latest",
-  mirror_type: "srv",
-  enabled: "yes"
-}
-EOF
-	pkg update
-	if [ -z "$install_from_ports" ]; then
-		pkg install -y pkg
-	else
-	    cd /usr/ports/ports-mgmt/pkg
-	    make -DBATCH reinstall clean
-	fi
-fi
+pkg bootstrap
+pkg update
 
 # echo 'rpcbind_enable="YES"' >> /etc/rc.conf
 # echo 'nfs_client_enable="YES"' >> /etc/rc.conf

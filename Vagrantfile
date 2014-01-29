@@ -5,15 +5,15 @@
 
 Vagrant.configure("2") do |config|
   config.vm.guest = :freebsd
-  config.vm.box = "freebsd-9.2-i386"
-  config.vm.box_url = "http://iris.hosting.lv/freebsd-9.2-i386.box"
+  config.vm.box = "freebsd-10.0-i386"
+  config.vm.box_url = "http://iris.hosting.lv/freebsd-10.0-i386.box"
 
   # Create a forwarded port mapping which allows access to a specific port
   # within the machine from a port on the host machine. In the example below,
   # accessing "localhost:8080" will access port 80 on the guest machine.
   config.vm.network :forwarded_port, guest:  80, host: 9080, auto_correct: true
-  config.vm.network :forwarded_port, guest: 443, host: 9443, auto_correct: true
-  config.vm.network :forwarded_port, guest: 943, host: 9943, auto_correct: true
+  config.vm.network :forwarded_port, guest: 443, host: 7443, auto_correct: true
+  config.vm.network :forwarded_port, guest: 943, host: 7943, auto_correct: true
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
