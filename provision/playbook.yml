@@ -92,7 +92,7 @@
       command: make WITH_LUCENE=yes WITH_MYSQL=yes -DBATCH install clean chdir=/usr/ports/mail/dovecot2 creates=/usr/local/sbin/dovecot
 
     - name: compile Exim with MySQL and SPF
-      command: make WITH_MYSQL=yes WITH_SPF=yes -DBATCH install clean chdir=/usr/ports/mail/exim creates=/usr/local/sbin/exim
+      command: make WITH_MYSQL=yes WITH_SPF=yes WITH_DKIM=yes -DBATCH install clean chdir=/usr/ports/mail/exim creates=/usr/local/sbin/exim
 
     - name: fix Nginx port to use OpenSSL from ports
       lineinfile: dest=/usr/ports/www/nginx/Makefile regexp=^WITH_OPENSSL_BASE= line='WITH_OPENSSL_PORT=yes'
