@@ -132,7 +132,7 @@ my $html_login_form = <<EOF
   <tbody>
   <tr>
     <td class="datright">E-mail:</td>
-    <td><input type="text" class="login_creds" name="login_username" value="\$login_username"></td>
+    <td><input type="text" class="login_creds" name="login_username" id="login_username" value="\$login_username" autofocus></td>
   </tr>
   <tr>
     <td class="datright">Password:</td>
@@ -146,6 +146,9 @@ my $html_login_form = <<EOF
 </table>
 </form>
 </center>
+<script type="text/javascript">
+  document.addEventListener('DOMContentLoaded', function() { document.getElementById('login_username').focus() })
+</script>
 EOF
 ;
 
