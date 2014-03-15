@@ -1,3 +1,6 @@
+0.9.2
+- Update Ansible playbook to match current FreeBSD Ports.
+
 0.9.1
 - Update Vagrant setup to use FreeBSD 10.0.
 
