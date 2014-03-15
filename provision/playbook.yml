@@ -3,10 +3,9 @@
 # Consult Vagrantfile and boostrap.sh for prereqisites.
 - hosts: all
   gather_facts: no
-  sudo: yes
 
   vars:
-    ansible_python_interpreter: /usr/local/bin/python2
+    ansible_python_interpreter: /usr/local/bin/python2.7
 
     mysql_root_password: password0
     mysql_mail_password: password1
@@ -32,6 +31,7 @@
     fqdn: "{{primary_hostname}}.{{primary_domain}}"
     ip: 192.168.33.10 # you may put a 0.0.0.0 here to bind services to all interfaces and be independent of IP
     admin_email: you\\@domain.com # \\@ is required due to Perl
+    perl_version: 5.18
 
     imap_dir: /var/imap
     dovecot_conf_dir: "{{etc}}/dovecot"
@@ -65,16 +65,11 @@
       - clucene
       - clamav
       - fcgiwrap
-      - git
       - libspf2
       - memcached
       - mysql55-server
       - openssl
-      - p5-CGI-Lite
-      - p5-DBD-mysql
-      - p5-Digest-HMAC
-      - p5-Mail-SpamAssassin
-      - pecl-memcache
+      - perl{{perl_version}}
       - php5
       - php5-extensions
       - php5-exif
@@ -83,22 +78,39 @@
       - php5-mcrypt
       - php5-openssl
       - php5-pdo_mysql
+      - pecl-memcache
       - py27-MySQLdb
       - spawn-fcgi
       - up-imapproxy
       - xcache
+      - gnupg1 # for spamassassin, broken in ports
+
+    - name: install CGI::Lite
+      command: make -DBATCH install clean chdir=/usr/ports/www/p5-CGI_Lite creates=/usr/local/lib/perl5/site_perl/{{perl_version}}/CGI/Lite.pm
+
+    - name: install DBD::mysql
+      command: make -DBATCH install clean chdir=/usr/ports/databases/p5-DBD-mysql creates=/usr/local/lib/perl5/site_perl/{{perl_version}}/mach/DBD/mysql.pm
+
+    - name: install Digest::HMAC
+      command: make -DBATCH install clean chdir=/usr/ports/security/p5-Digest-HMAC creates=/usr/local/lib/perl5/site_perl/{{perl_version}}/Digest/HMAC.pm
+
+    - name: install SpamAssassin
+      command: make -DBATCH install clean chdir=/usr/ports/mail/spamassassin creates=/usr/local/bin/spamd
 
     - name: compile Dovecot with MySQL and CLucene
-      command: make WITH_LUCENE=yes WITH_MYSQL=yes -DBATCH install clean chdir=/usr/ports/mail/dovecot2 creates=/usr/local/sbin/dovecot
+      command: make WITH="LUCENE MYSQL" -DBATCH install clean chdir=/usr/ports/mail/dovecot2 creates=/usr/local/sbin/dovecot
+
+    - name: fix Exim port to pass path to SPF2 library
+      lineinfile: dest=/usr/ports/mail/exim/Makefile regexp='(.*XX_SPF_LIBS_XX,-lspf2)(.*)' line='\1 -L/usr/local/lib\2' backrefs=yes
 
     - name: compile Exim with MySQL and SPF
-      command: make WITH_MYSQL=yes WITH_SPF=yes WITH_DKIM=yes -DBATCH install clean chdir=/usr/ports/mail/exim creates=/usr/local/sbin/exim
+      command: make WITH="DKIM MYSQL SPF" WITHOUT="ICONV" -DBATCH install clean chdir=/usr/ports/mail/exim creates=/usr/local/sbin/exim
 
     - name: fix Nginx port to use OpenSSL from ports
       lineinfile: dest=/usr/ports/www/nginx/Makefile regexp=^WITH_OPENSSL_BASE= line='WITH_OPENSSL_PORT=yes'
 
     - name: compile Nginx with SSL
-      command: make WITH_SPDY=yes -DBATCH install clean chdir=/usr/ports/www/nginx creates=/usr/local/sbin/nginx
+      command: make WITH="SPDY" -DBATCH install clean chdir=/usr/ports/www/nginx creates=/usr/local/sbin/nginx
 
     - name: create self-signed SSL cert
       command: >
@@ -111,6 +123,8 @@
 
     - name: disable MySQL TCP listener
       ini_file: dest=/var/db/mysql/my.cnf section=mysqld option=bind-address value=127.0.0.1 mode=0640 owner=mysql
+    #- name: disable MySQL 5.6+ performance_schema
+    #  ini_file: dest=/var/db/mysql/my.cnf section=mysqld option=performance_schema value=0 mode=0640 owner=mysql
     # - meta: flush_handlers
     - name: enable MySQL
       lineinfile: dest=/etc/rc.conf line='mysql_enable="YES"'
@@ -269,7 +283,7 @@
     - name: set SpamAssassin flags
       lineinfile: dest=/etc/rc.conf line='spamd_flags="-x -u spamd -H /var/spool/spamd"'
     - name: update SpamAssassin rules from internet
-      command: sa-update creates=/var/db/spamassassin
+      command: sa-update creates=/var/db/spamassassin/3.004000
     - service: name=sa-spamd state=started
 
     - name: add clamav user to mail group, for content scan
@@ -380,6 +394,7 @@
       template: src=../config/config-v1.1.xml dest={{www_dir}}/autoconfig.{{primary_domain}}/mail/config-v1.1.xml owner=root group=0
 
 
+  # unused
   handlers:
     - name: restart MySQL
       service: name=mysql-server state=restarted
