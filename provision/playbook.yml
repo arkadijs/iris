@@ -386,12 +386,12 @@
     - name: setup Autodiscover web directory
       file: state=directory path={{web_dir}}/Autodiscover
     - name: install Autodiscover config
-      template: src=../config/Autodiscover.xml dest={{web_dir}}/Autodiscover/Autodiscover.xml owner=root group=0
+      template: src=../config/Autodiscover.xml dest={{web_dir}}/Autodiscover/Autodiscover.xml owner=root group=0 mode=0644
 
     - name: setup Autoconfig web directory
       file: state=directory path={{www_dir}}/autoconfig.{{primary_domain}}/mail
     - name: install Autoconfig config
-      template: src=../config/config-v1.1.xml dest={{www_dir}}/autoconfig.{{primary_domain}}/mail/config-v1.1.xml owner=root group=0
+      template: src=../config/config-v1.1.xml dest={{www_dir}}/autoconfig.{{primary_domain}}/mail/config-v1.1.xml owner=root group=0 mode=0644
 
 
   # unused
