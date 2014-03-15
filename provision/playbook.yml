@@ -357,7 +357,7 @@
 
     - name: install robots.txt
       copy: |
-        owner=root group=0 dest={{web_dir}}/robots.txt content='User-agent: *
+        owner=root group=0 mode=0644 dest={{web_dir}}/robots.txt content='User-agent: *
         Disallow: /
         '
     - name: install Roundcube webmail
