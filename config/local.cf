@@ -1,0 +1,27 @@
+lock_method flock
+bayes_auto_learn 0
+report_safe 0
+required_score 5
+
+#whitelist_from root@*.domain.com
+blacklist_from subscribe@eurojobs.com
+
+meta MY_TO_EQ_FROM __TO_EQ_FROM
+score MY_TO_EQ_FROM 1.0
+score T_FILL_THIS_FORM_SHORT 1.0
+score KB_DATE_CONTAINS_TAB 1.0
+
+#score HEAD_ILLEGAL_CHARS    0.1
+#score FROM_ILLEGAL_CHARS    0.1
+#score SUBJ_ILLEGAL_CHARS    0.1
+#score RATWARE_HASH_2_V2     1.2
+#score HTML_TAG_BALANCE_BODY 1.5
+#score BIZ_TLD               1.5
+#score FROM_ENDS_IN_NUMS     0.1
+score RCVD_IN_PBL 2.0
+
+clear_report_template
+report Content analysis details: (_SCORE_ points, _REQD_ required)
+report pts  rule name              description
+report ---- ---------------------- --------------------------------------------------
+report _SUMMARY_

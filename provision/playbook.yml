@@ -282,6 +282,8 @@
       lineinfile: dest=/etc/rc.conf line='spamd_enable="YES"'
     - name: set SpamAssassin flags
       lineinfile: dest=/etc/rc.conf line='spamd_flags="-x -u spamd -H /var/spool/spamd"'
+    - name: install SpamAssassin config
+      copy: src=../config/local.cf dest=/usr/local/etc/mail/spamassassin/local.cf owner=root group=0 mode=0644
     - name: update SpamAssassin rules from internet
       command: sa-update creates=/var/db/spamassassin/3.004000
     - service: name=sa-spamd state=started
