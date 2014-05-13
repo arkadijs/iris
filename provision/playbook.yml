@@ -119,7 +119,7 @@
         -keyout {{ssl_dir}}/mail.key -out {{ssl_dir}}/mail.crt -extensions v3_ca
         creates={{ssl_dir}}/mail.crt
     - name: setup SSL key permissions
-      file: dest={{ssl_dir}}/mail.key mode=0600
+      file: dest={{ssl_dir}}/mail.key mode=0400 owner={{exim_user}}
 
     - name: disable MySQL TCP listener
       ini_file: dest=/var/db/mysql/my.cnf section=mysqld option=bind-address value=127.0.0.1 mode=0640 owner=mysql
@@ -147,7 +147,7 @@
       - roundcube
     - name: only root@localhost in MySQL
       command: >
-        mysql mysql -e "delete from user where not (user = 'root' and host = 'localhost'); flush privileges;"
+        mysql mysql -e "delete from user where not (user = 'root' and host = 'localhost'); delete from db where host = '%'; flush privileges; grant insert on mail.greylist to mail@localhost; grant select,insert,update,delete on mail.expires to mail@localhost;"
     - name: create 'mail' MySQL user
       mysql_user: state=present name=mail password={{mysql_mail_password}} priv=mail.*:select
     - name: create 'iris' MySQL user
