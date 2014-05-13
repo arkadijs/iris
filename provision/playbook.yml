@@ -226,6 +226,9 @@
         daily_status_mailq_enable="NO"
         daily_clean_hoststat_enable="NO"
         '
+    - name: setting up webmail cleanup crontab
+      cron: name=webmail user=www minute=1 hour=1 job='cd / && find {{rcub_dir}}/temp -maxdepth 1 -type f -mtime +2 -not -name .htaccess -print0 | xargs -0 rm'
+
     - name: setting up vacation cleanup crontab
       cron: name=vacation user=mailnull minute=2 hour=1 day=*/10 job='find /var/spool/exim/vacation -mtime +30 -a -type f -print0 | xargs -0 rm'
 
