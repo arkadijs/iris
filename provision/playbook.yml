@@ -235,7 +235,7 @@
     - name: setting up daily crontabs
       cron: name=daily.{{item.mi}} minute={{item.mi}} hour=1 job='{{item.cmd}}'
       with_items:
-      - { mi: 3, cmd: 'echo "delete from greylist where record_expires < now();" | /usr/local/bin/mysql mail' }
+      - { mi: 3, cmd: '/usr/local/bin/mysql -e "delete from greylist where record_expires < now();" mail' }
       - { mi: 4, cmd: '/usr/local/bin/doveadm expunge -A mailbox Trash savedbefore 30d' }
       - { mi: 5, cmd: '/usr/local/bin/doveadm expunge -A mailbox Spam  savedbefore 30d' }
       - { mi: 6, cmd: '/usr/local/bin/doveadm expunge -A mailbox Junk  savedbefore 30d' }
