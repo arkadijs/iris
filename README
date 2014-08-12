@@ -72,10 +72,10 @@ There are two alternatives:
 
 As for the later: install Vagrant, Ansible, VirtualBox. Execute
 $ vagrant up --provision
-in iris/ (this) folder to download base box (a Vagrant name for minimal prepared
+in this folder (iris/) to download base-box (a Vagrant name for minimal prepared
 VM image), and provision it with Ansible. The portsnap stage is a little bit
 slow, but this installation must build some ports with specific features.
-Server SSL certificate name and passwords are in provision/playbook.yml.
+Server SSL certificate CN and passwords are in provision/playbook.yml.
 
 After provisioning procedure successfully completes, please restart the VM with
 $ vagrant reload
@@ -97,7 +97,7 @@ https://192.168.33.10/rc (webmail)
 Connect your IMAP client to 192.168.33.10:993
 
 Below are manual installation instructions.
-If the instructions are unclear, then take a look at playbook.yml.
+If the instructions are unclear, then take a look at provision/playbook.yml.
 
 
 6. MySQL setup
@@ -147,7 +147,7 @@ Setup a cron job to purge old database files (crontab -e -u mailnull):
 
 Setup root crontab to expiry greylist entries, expunge Trash-es, rotate logs,
 and sync time:
-  3 1 * * * echo "delete from greylist where record_expires < now();" | /usr/local/bin/mysql mail
+  3 1 * * * /usr/local/bin/mysql -e 'delete from mail.greylist where record_expires < now();'
   4 1 * * * /usr/local/bin/doveadm expunge -A mailbox Trash savedbefore 30d
   5 1 * * * /usr/local/bin/doveadm expunge -A mailbox Spam  savedbefore 30d
   6 1 * * * /usr/local/bin/doveadm expunge -A mailbox Junk  savedbefore 30d
@@ -189,6 +189,17 @@ $ pkg install p5-CGI-Lite p5-DBD-mysql p5-Digest-HMAC
       SSLOptions +StdEnvVars
       DirectoryIndex iris.cgi
   </Directory>
+  For Nginx add to config:
+  location /iris {
+      index index.cgi;
+      location ~ \.cgi$ {
+          fastcgi_pass unix:/tmp/cgi.sock;
+      }
+  }
+  Install fcgiwrap, start iris.cgi:
+  env - LC_CTYPE=en_US.UTF-8 PATH=/none FCGI_WEB_SERVER_ADDRS=127.0.0.1 \
+    /usr/local/bin/spawn-fcgi -M 0770 -u dovecot -g dovecot -f '/usr/local/sbin/fcgiwrap -c 3' -s /tmp/cgi.sock >> /var/log/nginx/error.log 2>&1
+  chown :www /tmp/cgi.sock
 - Optionally configure SSL in webserver.
 
 
@@ -259,7 +270,7 @@ mysql> update accounts set superuser = 1 where account = 'account@name.here';
 11. qwatch.pl - maildir over-quota monitor
 
 If you want messages to over-quota mailboxes to be rejected at SMTP time you
-may run qwatch.pl. Edit the script to change configuration and run under
+should run qwatch.pl. Edit the script to change configuration and run it under
 dovecot user:
   $ su -m dovecot -c '/usr/local/sbin/qwatch.pl &'
 At start it will read the state from MySQL database, re-check the state of
