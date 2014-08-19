@@ -225,15 +225,15 @@ Optionally configure SSL in webserver.
     ```
 
   `alias` should be name without domain. `aliased,to` is email list. Name without domain part in `aliased,to` list means user in the same domain, like traditional `/etc/aliases` file `user1@domain2.com,user -> user1@domain2.com, user@domain.com`.
-- To update or delete accounts enter new info or check a checkbox, then press _Update_. You can update and delete multiple accounts in one step.
-- _Toggle SMTP_ checkbox toggles authenticated SMTP relay for particular acount, ie. if it is disabled it will be enabled, if it is enabled it will be disabled.
-- _Toggle AV_ checkbox disable or enable anti-virus and anti-spam filtering for account. AV filtering will be skipped if incoming mail has only one recipient with this flag set and no aliases expansion occurred before delivery.
-- _Aliases_ section works in similar way.
-- To edit vacation settings click on account name. When you change vacation status between off and custom, then custom text is preserved, but the text is erased if vacation is set to default text. Vacation message is UTF-8 clean.
-- To delegate domain management to the user, enter the list of managed domains into text area and set the quota. The quota will be shared across the specified domains and its usage will be updated even in case changes are made by other administrators or superusers. Only superuser can assign administrative rights.
-- _IMAP quota_ column may differs from _Quota_ because maildir quota may lag behind real (database stored) quota. Maildir quota is updated by Exim at delivery time.
-- _Inbox modified_ column shows the date when MUA modified the Inbox folder. Technically, it is a modification time of `maildir/cur/` directory.
-- It is recommended to create a real domain and e-email account for superuser and delete initial superuser account and domain. At least change the password. As a security measure, assignment of superuser rights to an account is only possible via mysql command line:
+8. To update or delete accounts enter new info or check a checkbox, then press _Update_. You can update and delete multiple accounts in one step.
+9. _Toggle SMTP_ checkbox toggles authenticated SMTP relay for particular acount, ie. if it is disabled it will be enabled, if it is enabled it will be disabled.
+10. _Toggle AV_ checkbox disable or enable anti-virus and anti-spam filtering for account. AV filtering will be skipped if incoming mail has only one recipient with this flag set and no aliases expansion occurred before delivery.
+11. _Aliases_ section works in similar way.
+12. To edit vacation settings click on account name. When you change vacation status between off and custom, then custom text is preserved, but the text is erased if vacation is set to default text. Vacation message is UTF-8 clean.
+13. To delegate domain management to the user, enter the list of managed domains into text area and set the quota. The quota will be shared across the specified domains and its usage will be updated even in case changes are made by other administrators or superusers. Only superuser can assign administrative rights.
+14. _IMAP quota_ column may differs from _Quota_ because maildir quota may lag behind real (database stored) quota. Maildir quota is updated by Exim at delivery time.
+15. _Inbox modified_ column shows the date when MUA modified the Inbox folder. Technically, it is a modification time of `maildir/cur/` directory.
+16. It is recommended to create a real domain and e-email account for superuser and delete initial superuser account and domain. At least change the password. As a security measure, assignment of superuser rights to an account is only possible via mysql command line:
     
     ```
     mysql> update accounts set superuser = 1 where account = 'account@name.here';
