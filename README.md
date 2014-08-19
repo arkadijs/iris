@@ -208,23 +208,20 @@ Optionally configure SSL in webserver.
     account[,QuotaMB,FirstName,Surname,phone#,other email,other info]
     ```
 
-  For example:
+    For example:
 
-    ```
-    john
-    smit,20
-    someone,25,Some,One,+371 9xxx,secret@email.com,bla-bla-bla goes here comma,allowed
-    sparse,,,1234,,info
-    ```
+    `john`, `jerry,20`, `someone,25,Some,One,+1 9xxx,secret@email.com,bla-bla-bla goes here comma,allowed`, `sparse,,,1234,,allowed too`.
 
-  Default quota is defined in `iris.cgi`.
+    Default quota is defined in `iris.cgi`.
+
 7. _Create Aliases_ works similarly. Format:
 
     ```
     alias aliased,to,..
     ```
 
-  `alias` should be name without domain. `aliased,to` is email list. Name without domain part in `aliased,to` list means user in the same domain, like traditional `/etc/aliases` file `user1@domain2.com,user -> user1@domain2.com, user@domain.com`.
+    `alias` should be name without domain. `aliased,to` is email list. Name without domain part in `aliased,to` list means user in the same domain, like traditional `/etc/aliases` file `user1@domain2.com,user -> user1@domain2.com, user@domain.com`.
+
 8. To update or delete accounts enter new info or check a checkbox, then press _Update_. You can update and delete multiple accounts in one step.
 9. _Toggle SMTP_ checkbox toggles authenticated SMTP relay for particular acount, ie. if it is disabled it will be enabled, if it is enabled it will be disabled.
 10. _Toggle AV_ checkbox disable or enable anti-virus and anti-spam filtering for account. AV filtering will be skipped if incoming mail has only one recipient with this flag set and no aliases expansion occurred before delivery.
