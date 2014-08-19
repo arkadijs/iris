@@ -203,10 +203,11 @@ Optionally configure SSL in webserver.
 4. Every button on domain administration page work with corresponding section only. For example, you can't create and delete accounts in one step.
 5. Domain level settings allows you to change default authenticated SMTP relay policy for new accounts, to disable clients logins, and to hide the domain from MTA.
 6. To create account, enter information in following format:
-    
+
     ```
     account[,QuotaMB,FirstName,Surname,phone#,other email,other info]
     ```
+
   For example:
 
     ```
@@ -215,12 +216,14 @@ Optionally configure SSL in webserver.
     someone,25,Some,One,+371 9xxx,secret@email.com,bla-bla-bla goes here comma,allowed
     sparse,,,1234,,info
     ```
+
   Default quota is defined in `iris.cgi`.
 7. _Create Aliases_ works similarly. Format:
 
     ```
     alias aliased,to,..
     ```
+
   `alias` should be name without domain. `aliased,to` is email list. Name without domain part in `aliased,to` list means user in the same domain, like traditional `/etc/aliases` file `user1@domain2.com,user -> user1@domain2.com, user@domain.com`.
 8. To update or delete accounts enter new info or check a checkbox, then press _Update_. You can update and delete multiple accounts in one step.
 9. _Toggle SMTP_ checkbox toggles authenticated SMTP relay for particular acount, ie. if it is disabled it will be enabled, if it is enabled it will be disabled.
