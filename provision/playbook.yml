@@ -3,6 +3,7 @@
 # Consult Vagrantfile and boostrap.sh for prereqisites.
 - hosts: all
   gather_facts: no
+  sudo: yes
 
   vars:
     ansible_python_interpreter: /usr/local/bin/python2.7
@@ -11,6 +12,7 @@
     mysql_mail_password: password1
     mysql_iris_password: password2 # escape @, %, $ with \\ - see admin_email below
     mysql_rcub_password: password3
+    rcub_random: thei1kooneiWaeWae3oZ2hie
 
     prefix: /usr/local/
     etc: "{{prefix}}etc"
@@ -22,7 +24,7 @@
     exim_spool: /var/spool/exim # drwxr-x--- mailnull:mail on FreeBSD
     exim_log_dir: /var/log/exim
     exim_user: mailnull
-    exim_group: mail # unused, exim is operated under 'mail' group, which is also a supplementary group for clamav
+    exim_group: mail # exim is operated under 'mail' group, which is also a supplementary group for clamav
     exim_vacation_user: smmsp
     exim_vacation_group: mail # unused
     exim_vacation_dir_group: mailnull
@@ -30,7 +32,7 @@
     primary_domain: domain.com
     fqdn: "{{primary_hostname}}.{{primary_domain}}"
     ip: 192.168.33.10 # you may put a 0.0.0.0 here to bind services to all interfaces and be independent of IP
-    admin_email: you\\@domain.com # \\@ is required due to Perl
+    admin_email: you\\\\\\@domain.com # \@ is required due to Perl
     perl_version: 5.18
 
     imap_dir: /var/imap
@@ -42,7 +44,7 @@
     www_dir: /www
     web_dir: "{{www_dir}}/{{fqdn}}"
     rcub_dir: "{{web_dir}}/rc"
-    rcub_dist: http://netcologne.dl.sourceforge.net/project/roundcubemail/roundcubemail/0.9.5/roundcubemail-0.9.5.tar.gz
+    rcub_dist: http://netcologne.dl.sourceforge.net/project/roundcubemail/roundcubemail/1.0.4/roundcubemail-1.0.4.tar.gz
     rcub_vacation_dir: "{{rcub_dir}}/plugins/vacation"
     rcub_vacation_dist: https://github.com/bhuisgen/rc-vacation/archive/master.tar.gz
     bin_dir: "{{prefix}}bin"
@@ -67,9 +69,10 @@
       - fcgiwrap
       - libspf2
       - memcached
+      - mime-support
       - mysql55-server
       - openssl
-      - perl{{perl_version}}
+      - perl5
       - php5
       - php5-extensions
       - php5-exif
@@ -86,13 +89,13 @@
       - gnupg1 # for spamassassin, broken in ports
 
     - name: install CGI::Lite
-      command: make -DBATCH install clean chdir=/usr/ports/www/p5-CGI_Lite creates=/usr/local/lib/perl5/site_perl/{{perl_version}}/CGI/Lite.pm
+      command: make -DBATCH install clean chdir=/usr/ports/www/p5-CGI_Lite creates=/usr/local/lib/perl5/site_perl/CGI/Lite.pm
 
     - name: install DBD::mysql
-      command: make -DBATCH install clean chdir=/usr/ports/databases/p5-DBD-mysql creates=/usr/local/lib/perl5/site_perl/{{perl_version}}/mach/DBD/mysql.pm
+      command: make -DBATCH install clean chdir=/usr/ports/databases/p5-DBD-mysql creates=/usr/local/lib/perl5/site_perl/mach/{{perl_version}}/DBD/mysql.pm
 
     - name: install Digest::HMAC
-      command: make -DBATCH install clean chdir=/usr/ports/security/p5-Digest-HMAC creates=/usr/local/lib/perl5/site_perl/{{perl_version}}/Digest/HMAC.pm
+      command: make -DBATCH install clean chdir=/usr/ports/security/p5-Digest-HMAC creates=/usr/local/lib/perl5/site_perl/Digest/HMAC.pm
 
     - name: install SpamAssassin
       command: make -DBATCH install clean chdir=/usr/ports/mail/spamassassin creates=/usr/local/bin/spamd
@@ -147,7 +150,7 @@
       - roundcube
     - name: only root@localhost in MySQL
       command: >
-        mysql mysql -e "delete from user where not (user = 'root' and host = 'localhost'); delete from db where host = '%'; flush privileges; grant insert on mail.greylist to mail@localhost; grant select,insert,update,delete on mail.expires to mail@localhost;"
+        mysql mysql -e "delete from user where not (user = 'root' and host = 'localhost'); delete from db where host = '%'; flush privileges;"
     - name: create 'mail' MySQL user
       mysql_user: state=present name=mail password={{mysql_mail_password}} priv=mail.*:select
     - name: create 'iris' MySQL user
@@ -158,6 +161,8 @@
       copy: src=../iris.sql dest=/tmp/
     - name: create 'mail' database tables
       command: mysql mail -e '\. /tmp/iris.sql' creates=/var/db/mysql/mail/accounts.frm
+    - name: grant additional 'mail' database privileges
+      command: mysql -e 'grant insert on mail.greylist to mail@localhost; grant select,insert,update,delete on mail.expires to mail@localhost;'
 
     - name: install main Exim config
       template: src=../exim.conf dest={{exim_conf_dir}}/{{exim_conf_file}} owner=root mode=0600 backup=yes
@@ -211,6 +216,9 @@
     # g+s on directory is not required on FreeBSD for files to receive the group ownership, but let it be documented here
     # the reason for over-complicated setup is that 'mailnull' (primary Exim user) cron could manipulate vacation dir content
     # (a) no separate crontab for 'smmsp' is required and (b) no permission for 'smmsp' on spool dir
+    - name: create Exim spool directory
+      file: dest={{exim_spool}} state=directory owner={{exim_user}} group={{exim_group}} mode=750
+
     - name: create Exim vacation directory
       file: dest={{exim_spool}}/vacation state=directory owner={{exim_vacation_user}} group={{exim_vacation_dir_group}} mode=2775
 
@@ -381,12 +389,12 @@
       file: state=directory path={{rcub_dir}}/logs group=www mode=0770
     - name: setup Roundcube temp directory
       file: state=directory path={{rcub_dir}}/temp group=www mode=0770
-    - name: setup Roundcube main config
-      copy: src=../config/main.inc.php dest={{rcub_dir}}/config owner=root group=www
-    - name: setup Roundcube db config
-      template: src=../config/db.inc.php dest={{rcub_dir}}/config owner=root group=www mode=0660
+    - name: setup Roundcube config
+      template: src=../config/config.inc.php dest={{rcub_dir}}/config owner=root group=www mode=0640
     - name: setup Roundcube vacation plugin config
       template: src=../config/vacation-config.inc.php dest={{rcub_vacation_dir}}/config.inc.php owner=root group=www mode=0660
+    - name: setup Roundcube mime.types
+      command: creates=/usr/share/misc/mime.types cp /usr/local/etc/mime.types /usr/share/misc/
 
     - name: setup Autodiscover web directory
       file: state=directory path={{web_dir}}/Autodiscover

@@ -1,12 +1,17 @@
 # -*- mode: ruby; -*-
 
 # This is a slightly modified copy of
-# https://github.com/arkadijs/vagrant-freebsd
+# https://github.com/arkadijs/vagrant-freebsd/blob/master/Vagrantfile
 
 Vagrant.configure("2") do |config|
   config.vm.guest = :freebsd
-  config.vm.box = "freebsd-10.0-i386"
-  config.vm.box_url = "http://iris.hosting.lv/freebsd-10.0-i386.box"
+  config.vm.box = "freebsd-10.1-i386"
+  config.vm.box_url = "http://iris.hosting.lv/freebsd-10.1-i386.box"
+
+  # The box has 2 vtnet adapters configured:
+  # vtnet0 => nat
+  # vtnet1 => host-only
+  # Adapters are renamed by FreeBSD rc.conf to em0,1
 
   # Create a forwarded port mapping which allows access to a specific port
   # within the machine from a port on the host machine. In the example below,
@@ -17,7 +22,7 @@ Vagrant.configure("2") do |config|
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
-  config.vm.network :private_network, ip: "192.168.33.10"
+  config.vm.network :private_network, ip: "192.168.33.10", adapter: 2
 
   # Create a public network, which generally matched to bridged network.
   # Bridged networks make the machine appear as another physical device on
